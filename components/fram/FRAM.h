@@ -6,7 +6,8 @@
 //    DATE: 2018-01-24
 // PURPOSE: Arduino library for I2C FRAM
 //     URL: https://github.com/RobTillaart/FRAM_I2C
-
+//
+// ESPHome port: https://github.com/sharkydog/esphome-fram
 
 #include "esphome/core/hal.h"
 #include "esphome/core/log.h"
