@@ -13,13 +13,6 @@ FRAM9Component = fram_ns.class_("FRAM9", FRAMComponent)
 FRAM11Component = fram_ns.class_("FRAM11", FRAMComponent)
 FRAM32Component = fram_ns.class_("FRAM32", FRAMComponent)
 
-FRAM_TYPES = {
-    "FRAM": FRAMComponent,
-    "FRAM9": FRAM9Component,
-    "FRAM11": FRAM11Component,
-    "FRAM32": FRAM32Component
-}
-
 def validate_bytes_1024(value):
     value = cv.string(value).lower()
     match = re.match(r"^([0-9]+)\s*(\w*)$", value)
@@ -42,22 +35,27 @@ def validate_bytes_1024(value):
 
     return int(int(match.group(1)) * SUFF[match.group(2)])
 
-CONFIG_SCHEMA = (
-    cv.Schema(
-        {
-            cv.GenerateID(): cv.declare_id(FRAMComponent),
-            cv.Optional(CONF_TYPE, default="FRAM"): cv.one_of(
-                *FRAM_TYPES, upper=True, space="_"
-            ),
-            cv.Optional(CONF_SIZE): validate_bytes_1024
-        }
-    )
-    .extend(cv.COMPONENT_SCHEMA)
-    .extend(i2c.i2c_device_schema(0x50))
-)
+
+FRAM_SCHEMA = cv.Schema({
+    cv.Optional(CONF_SIZE): validate_bytes_1024
+}).extend(cv.COMPONENT_SCHEMA).extend(i2c.i2c_device_schema(0x50))
+
+CONFIG_SCHEMA = cv.typed_schema({
+    "FRAM": FRAM_SCHEMA.extend({
+        cv.GenerateID(): cv.declare_id(FRAMComponent)
+    }),
+    "FRAM9": FRAM_SCHEMA.extend({
+        cv.GenerateID(): cv.declare_id(FRAM9Component)
+    }),
+    "FRAM11": FRAM_SCHEMA.extend({
+        cv.GenerateID(): cv.declare_id(FRAM11Component)
+    }),
+    "FRAM32": FRAM_SCHEMA.extend({
+        cv.GenerateID(): cv.declare_id(FRAM32Component)
+    })
+}, key=CONF_TYPE, default_type="FRAM", upper=True)
 
 async def to_code(config):
-    config[CONF_ID].type = FRAM_TYPES[config[CONF_TYPE]]
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     await i2c.register_i2c_device(var, config)
