@@ -232,8 +232,11 @@ uint16_t FRAM::getSize()
 {
   uint16_t density = _getMetaData(2);
   uint16_t size = 0;
-  if (density > 0) size = (1UL << density);
-  _sizeBytes = size * 1024UL;
+  if (density > 0)
+  {
+    size = (1UL << density);
+    _sizeBytes = size * 1024UL;
+  }
   return size;
 }
 
@@ -306,7 +309,7 @@ uint16_t FRAM::_getMetaData(uint8_t field)
 
   uint8_t data[3] = {0,0,0};
   i2c::ErrorCode err = bus_->read(FRAM_SLAVE_ID_, data, 3);
-  if (err != i2c::ERROR_OK) return -1;
+  if (err != i2c::ERROR_OK) return 0;
 
   //  MANUFACTURER
   if (field == 0) return (data[0] << 4) + (data[1] >> 4);
