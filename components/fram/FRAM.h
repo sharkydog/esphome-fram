@@ -22,6 +22,7 @@ class FRAM : public Component, public i2c::I2CDevice
 public:
   void setup() override;
   void dump_config() override;
+  float get_setup_priority() const override { return setup_priority::BUS; }
 
   bool     isConnected();
 
