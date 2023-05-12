@@ -42,11 +42,17 @@ class FRAMPreferenceBackend : public ESPPreferenceBackend {
     
     bool save(const uint8_t *data, size_t len) override {
       _save_counter++;
-      _SVLD_STRUCT _save = {.type=type_, .size16=(uint16_t)len, .size32=len, .sizet=len, .addr=addr_, .scss=1, .data={0,0,0}};
+      _SVLD_STRUCT _save = {.type=type_, .size16=(uint16_t)len, .size32=len, .sizet=len, .addr=addr_, .scss=0, .data={0,0,0}};
+      
+      if (!fram_->isConnected()) {
+        _saves.push_back(_save);
+        return false;
+      }
       
       fram_->write(addr_, (uint8_t*)data, len);
       fram_->write(addr_+len, (uint8_t*)&type_, 4);
       
+      _save.scss = 1;
       int j = std::min<int>(3,len);
       for (uint8_t i = 0; i < j; i++) _save.data[i] = data[i];
       _saves.push_back(_save);
@@ -58,6 +64,10 @@ class FRAMPreferenceBackend : public ESPPreferenceBackend {
       _load_counter++;
       _SVLD_STRUCT _load = {.type=type_, .size16=(uint16_t)len, .size32=len, .sizet=len, .addr=addr_, .scss=0, .data={0,0,0}};
       
+      if (!fram_->isConnected()) {
+        _loads.push_back(_load);
+        return false;
+      }
       if (type_ != fram_->read32(addr_+len)) {
         _loads.push_back(_load);
         return false;
@@ -87,21 +97,7 @@ FRAM_PREF::FRAM_PREF(fram::FRAM * fram, uint16_t pool_size, uint16_t pool_start=
 }
 
 void FRAM_PREF::setup() {
-  uint16_t fram_size = fram_->getSizeBytes();
-  uint16_t pool_end = pool_start_ + pool_size_;
-  
-  if (!fram_size) {
-    ESP_LOGE(TAG, "Device returns 0 size!");
-    mark_failed();
-    return;
-  }
-  if (pool_end > fram_size) {
-    ESP_LOGE(TAG, "Pool (%u-%u) does not fit in FRAM (0-%u)!", pool_start_, (pool_end-1), (fram_size-1));
-    mark_failed();
-    return;
-  }
-  if (!fram_->isConnected()) {
-    ESP_LOGE(TAG, "Device connect failed!");
+  if (!_check()) {
     mark_failed();
     return;
   }
@@ -113,35 +109,26 @@ void FRAM_PREF::setup() {
     pool_cleared_ = true;
   }
   
-  //pref_prev_ = global_preferences;
+  pref_prev_ = global_preferences;
   global_preferences = this;
 }
 
 void FRAM_PREF::dump_config() {
-  uint16_t fram_size = fram_->getSizeBytes();
-  uint16_t pool_end = pool_start_ + pool_size_;
-  
   ESP_LOGCONFIG(TAG, "FRAM_PREF:");
-  ESP_LOGCONFIG(TAG, "  Pool: %u bytes (%u-%u)", pool_size_, pool_start_, (pool_end-1));
+  ESP_LOGCONFIG(TAG, "  Pool: %u bytes (%u-%u)", pool_size_, pool_start_, (pool_start_+pool_size_-1));
   
-  if (is_failed()) {
-    ESP_LOGE(TAG, "  Failed!");
-  }
-  if (!fram_size) {
-    ESP_LOGE(TAG, "  Device returns 0 size!");
+  if (!_check()) {
     return;
   }
   
-  ESP_LOGCONFIG(TAG, "  Hash: %u", fram_->read32(pool_start_));
-  
-  if (pool_end > fram_size) {
-    ESP_LOGE(TAG, "  Does not fit in FRAM (0-%u)!", (fram_size-1));
-  } else {
-    if (pool_cleared_) {
-      ESP_LOGD(TAG, "  Pool was cleared on boot");
-    }
-    ESP_LOGCONFIG(TAG, "  Pool: %u bytes used", pool_next_ - pool_start_ - 4);
+  if (pool_cleared_) {
+    ESP_LOGD(TAG, "  Pool was cleared");
   }
+  ESP_LOGCONFIG(TAG, "  Pool: %u bytes used", pool_next_ - pool_start_ - 4);
+  
+  ESP_LOGCONFIG(TAG, "  Hash: %u", fram_->read32(pool_start_));
+  ESP_LOGCONFIG(TAG, "  pref prev: %p", pref_prev_);
+  ESP_LOGCONFIG(TAG, "  pref glob: %p", global_preferences);
   
   ESP_LOGD(TAG, "  make_preference() called %u times", _pref_counter);
   for (auto & _pref : _prefs) {
@@ -164,13 +151,33 @@ void FRAM_PREF::dump_config() {
   }
 }
 
+bool FRAM_PREF::_check() {
+  uint16_t fram_size = fram_->getSizeBytes();
+  uint16_t pool_end = pool_start_ + pool_size_;
+  
+  if (!fram_size) {
+    ESP_LOGE(TAG, "Device returns 0 size!");
+    return false;
+  }
+  if (pool_end > fram_size) {
+    ESP_LOGE(TAG, "Pool (%u-%u) does not fit in FRAM (0-%u)!", pool_start_, (pool_end-1), (fram_size-1));
+    return false;
+  }
+  if (!fram_->isConnected()) {
+    ESP_LOGE(TAG, "Device connect failed!");
+    return false;
+  }
+  
+  return true;
+}
+
 void FRAM_PREF::_clear() {
   uint8_t buff[16];
   uint16_t pool_end = pool_start_ + pool_size_;
   
   for (uint8_t i = 0; i < 16; i++) buff[i] = 0;
   
-  for (uint16_t addr = pool_start_; addr < pool_end; addr += 16) {
+  for (uint16_t addr = pool_start_+4; addr < pool_end; addr += 16) {
     fram_->write(addr, buff, std::min(16,pool_end-addr));
   }
   
@@ -182,6 +189,10 @@ ESPPreferenceObject FRAM_PREF::make_preference(size_t length, uint32_t type, boo
 }
 
 ESPPreferenceObject FRAM_PREF::make_preference(size_t length, uint32_t type) {
+  if (is_failed()) {
+    return {};
+  }
+  
   uint16_t pool_end = pool_start_ + pool_size_;
   uint16_t next = pool_next_ + length + 4;
   
@@ -200,14 +211,12 @@ ESPPreferenceObject FRAM_PREF::make_preference(size_t length, uint32_t type) {
 }
 
 bool FRAM_PREF::sync() {
-  //pref_prev_->sync();
-  return true;
+  return pref_prev_->sync();
 }
 
 bool FRAM_PREF::reset() {
-  _clear();
-  //pref_prev_->reset();
-  return true;
+  fram_->write32(pool_start_, 0);
+  return pref_prev_->reset();
 }
 
 }  // namespace fram_pref

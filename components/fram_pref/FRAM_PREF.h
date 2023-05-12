@@ -21,6 +21,7 @@ class FRAM_PREF : public Component, public ESPPreferences {
     bool reset() override;
   
   protected:
+    bool _check();
     void _clear();
     
     fram::FRAM * fram_;
