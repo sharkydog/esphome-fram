@@ -22,7 +22,7 @@ class FRAMPreferenceBackend : public ESPPreferenceBackend {
     
     bool load(uint8_t *data, size_t len) override {
       fram_->read(addr_, data, len);
-      return true;
+      return true; // <= crash
     }
   
   protected:
@@ -66,10 +66,7 @@ void FRAM_PREF::setup() {
   
   //pref_prev_ = global_preferences;
   
-  //global_preferences = this; // <== crash
-  
-  //ESPPreferences * p = this;
-  //global_preferences = p; // <== crash
+  global_preferences = this; // <== crash, nope, this is fine
 }
 
 void FRAM_PREF::dump_config() {
