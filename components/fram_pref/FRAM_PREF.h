@@ -13,6 +13,7 @@ class FRAM_PREF : public Component, public ESPPreferences {
     
     void setup() override;
     void dump_config() override;
+    float get_setup_priority() const override { return setup_priority::BUS; }
     
     ESPPreferenceObject make_preference(size_t length, uint32_t type, bool in_flash) override;
     ESPPreferenceObject make_preference(size_t length, uint32_t type) override;
