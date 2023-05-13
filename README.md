@@ -56,9 +56,7 @@ Fore more info on methods and supported devices, see [RobTillaart/FRAM_I2C/READM
 ## EXPERIMENTAL - global_preferences handler
 Added a new component that replaces global_preferences, meaning wherever there is a setting "restore from flash" or similar, those states will be written in FRAM.
 
-Tested only with a Switch on ESP8266 for now.
-
-Not confirmed for ESP32 and ESP-IDF.
+Tested with a Switch on ESP8266 and ESP32-C3 with ESP-IDF.
 
 All preferences will be wiped out on reflash.
 Later, I may add a more persistant option, when I figure out how it should work.
