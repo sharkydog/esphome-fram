@@ -52,3 +52,39 @@ Multiple devices can be used at the same time.
 **I only have MB85RC256V, it has no sleep function, so my `FRAM9/FRAM11/FRAM32` and `FRAM::sleep()` are not tested**.
 
 Fore more info on methods and supported devices, see [RobTillaart/FRAM_I2C/README.md](https://github.com/RobTillaart/FRAM_I2C/blob/master/README.md)
+
+## fram_pref - global_preferences handler
+A component that replaces global_preferences, meaning wherever there is a setting "restore from flash" or similar, those states will be written in FRAM.
+
+Tested with a Switch on ESP8266 and ESP32-C3 with ESP-IDF.
+
+All preferences will be wiped out on reflash.
+A more persistant option (to survive reflash, config change, etc) may be added in the future, when I figure out how it should work (help is always wellcome).
+
+```yaml
+external_components:
+  - source: github://sharkydog/esphome-fram
+    components: [ fram, fram_pref ]
+
+i2c:
+  scl: 10
+  sda: 8
+  id: i2c_1
+
+fram:
+ - id: fram_1
+
+fram_pref:
+  fram_id: fram_1
+  pool_size: 1KiB
+  pool_start: 100
+
+switch:
+  - platform: gpio
+    pin: 12
+    name: "test switch"
+    id: switch_1
+    restore_mode: RESTORE_DEFAULT_OFF
+```
+- **pool_size** - (**_required_**) Size of the pool to hold preferences, min 9, max 65535 (64KiB)
+- **pool_start** - (*optional*, *default 0*) Starting address for the pool
