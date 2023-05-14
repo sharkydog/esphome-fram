@@ -53,20 +53,18 @@ Multiple devices can be used at the same time.
 
 Fore more info on methods and supported devices, see [RobTillaart/FRAM_I2C/README.md](https://github.com/RobTillaart/FRAM_I2C/blob/master/README.md)
 
-## EXPERIMENTAL - global_preferences handler
-Added a new component that replaces global_preferences, meaning wherever there is a setting "restore from flash" or similar, those states will be written in FRAM.
+## fram_pref - global_preferences handler
+A component that replaces global_preferences, meaning wherever there is a setting "restore from flash" or similar, those states will be written in FRAM.
 
 Tested with a Switch on ESP8266 and ESP32-C3 with ESP-IDF.
 
 All preferences will be wiped out on reflash.
-Later, I may add a more persistant option, when I figure out how it should work.
+A more persistant option (to survive reflash, config change, etc) may be added in the future, when I figure out how it should work (help is always wellcome).
 
 ```yaml
 external_components:
   - source: github://sharkydog/esphome-fram
-    components: [ fram ]
-  - source: github://sharkydog/esphome-fram@test_pref
-    components: [ fram_pref ]
+    components: [ fram, fram_pref ]
 
 i2c:
   scl: 10
