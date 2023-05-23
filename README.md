@@ -58,8 +58,10 @@ A component that replaces global_preferences, meaning wherever there is a settin
 
 Tested with a Switch on ESP8266 and ESP32-C3 with ESP-IDF.
 
-All preferences will be wiped out on reflash.
-A more persistant option (to survive reflash, config change, etc) may be added in the future, when I figure out how it should work (help is always wellcome).
+All preferences in the pool will be wiped out on reflash.
+
+A more persistant option can be added through static preferences (see bellow).
+A pool or at least one static preference must be defined, or both.
 
 ```yaml
 external_components:
@@ -86,5 +88,51 @@ switch:
     id: switch_1
     restore_mode: RESTORE_DEFAULT_OFF
 ```
-- **pool_size** - (**_required_**) Size of the pool to hold preferences, min 9, max 65535 (64KiB)
-- **pool_start** - (*optional*, *default 0*) Starting address for the pool
+- **pool_size** - (*optional*) Size of the pool to hold preferences, min 7, max 65536 (64KiB)
+- **pool_start** - (*optional*, *default 0*) Starting address for the pool, max 65528
+
+### Static preferences
+A list of preferences can be added to be kept after reflash.
+They will not be cleared unless a component changes its internal hash (like changing entity name).
+If **_persist_key_** option is used, the preference will be cleared only if **_key_** is changed.
+
+Keep in mind, that if this internal hash changes, the component probably wants its preferences cleared.
+
+```yaml
+fram_pref:
+  fram_id: fram_1
+  pool_size: 1KiB
+  pool_start: 100
+  static_prefs:
+    - key: sw1
+      lambda: return id(switch_1).get_object_id_hash();
+      addr: 12
+      size: 3
+      persist_key: true
+    - key: wifi
+      lambda: return fnv1_hash(App.get_compilation_time());
+```
+- **key** - (**_required_**, string) Unique key for this preference
+- **lambda** - (**_required_**) A lambda to return the same hash components use in *make_preference()* call, most components (entities) use *get_object_id_hash()*, which is a hash of the name or id.
+- **addr** - (*optional*, *default 0*) Starting address
+- **size** - (*optional*) Size, requested size will be reported in logs
+- **persist_key** - (*optional*, *default false*) Persist after hash change, change **_key_** to clear
+
+Add either both **_addr_** and **_size_** or none of them. If they are not added, preference will be ignored and saved nowhere, but reported in logs (so you know what size to set).
+
+Address ranges can not overlap with each other or with the pool (if set).
+
+Logs will report something like this for each preference:
+`Pref: key: sw1, persist_key, addr: 12-14, request size: 3`
+
+- If `key: sw1` is numeric, preference is in the pool and not static
+- `persist_key` will not be shown if the option above is not used
+- `addr: 12-14` is start-end address (inclusive) in FRAM, not shown if **_addr_**, **_size_** and pool were not set, this means preference is *ignored*
+- `request size: 3` is the size that needs to be set in **_size_**, if this does not show, *make_preference()* was not called for this hash (returned with **_lambda_**)
+
+So, to set a static preference for some component or entity:
+- search esphome source for *make_preference* and see how the hash is being generated.
+- put something in **_lambda_** that will generate the same.
+- compile, upload and look in the logs for your key
+- set **_addr_** that does not overlap with pool or other preference and **_size_** to what is reported with `request size: 3`
+- compile, upload and done
