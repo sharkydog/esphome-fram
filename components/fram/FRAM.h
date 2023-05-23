@@ -54,12 +54,12 @@ public:
 
   template <class T> uint16_t writeObject(uint16_t memaddr, T &obj)
   {
-    write(memaddr, (uint8_t *) &obj, sizeof(obj));
+    this->write(memaddr, (uint8_t *) &obj, sizeof(obj));
     return memaddr + sizeof(obj);
   };
   template <class T> uint16_t readObject(uint16_t memaddr, T &obj)
   {
-    read(memaddr, (uint8_t *) &obj, sizeof(obj));
+    this->read(memaddr, (uint8_t *) &obj, sizeof(obj));
     return memaddr + sizeof(obj);
   }
 

@@ -11,36 +11,36 @@ static const char * const TAG = "fram_pref";
 class FRAMPreferenceBackend : public ESPPreferenceBackend {
   public:
     FRAMPreferenceBackend(FRAM_PREF * comp, uint32_t type, uint8_t idx) {
-      comp_ = comp;
-      type_ = type;
-      idx_ = idx;
+      this->comp_ = comp;
+      this->type_ = type;
+      this->idx_ = idx;
     }
     
     bool save(const uint8_t *data, size_t len) override {
-      if (!comp_->fram_->isConnected()) {
+      if (!this->comp_->fram_->isConnected()) {
         return false;
       }
       
-      auto & pref = comp_->prefs_[idx_];
+      auto & pref = this->comp_->prefs_[this->idx_];
       
       if( (pref.size_req-2) != (uint16_t)len ) {
         return false;
       }
       
-      uint16_t checksum = checksum_((uint8_t*)data, len);
+      uint16_t checksum = this->checksum_((uint8_t*)data, len);
       
-      comp_->fram_->write(pref.addr, (uint8_t*)data, len);
-      comp_->fram_->write(pref.addr+len, (uint8_t*)&checksum, 2);
+      this->comp_->fram_->write(pref.addr, (uint8_t*)data, len);
+      this->comp_->fram_->write(pref.addr+len, (uint8_t*)&checksum, 2);
       
       return true;
     }
     
     bool load(uint8_t *data, size_t len) override {
-      if (!comp_->fram_->isConnected()) {
+      if (!this->comp_->fram_->isConnected()) {
         return false;
       }
       
-      auto & pref = comp_->prefs_[idx_];
+      auto & pref = this->comp_->prefs_[this->idx_];
       
       if( (pref.size_req-2) != (uint16_t)len ) {
         return false;
@@ -48,9 +48,9 @@ class FRAMPreferenceBackend : public ESPPreferenceBackend {
       
       std::vector<uint8_t> buff;
       buff.resize(len);
-      comp_->fram_->read(pref.addr, buff.data(), len);
+      this->comp_->fram_->read(pref.addr, buff.data(), len);
       
-      if (checksum_(buff.data(), len) != comp_->fram_->read16(pref.addr+len)) {
+      if (this->checksum_(buff.data(), len) != this->comp_->fram_->read16(pref.addr+len)) {
         return false;
       }
       
@@ -60,7 +60,7 @@ class FRAMPreferenceBackend : public ESPPreferenceBackend {
   
   protected:
     uint16_t checksum_(uint8_t *data, size_t len) {
-      uint16_t sum = (type_ >> 16) + (type_ & 0xFFFF);
+      uint16_t sum = (this->type_ >> 16) + (this->type_ & 0xFFFF);
       
       for (size_t i = 0; i < len; i++) {
         sum += data[i];
@@ -75,13 +75,13 @@ class FRAMPreferenceBackend : public ESPPreferenceBackend {
 };
 
 FRAM_PREF::FRAM_PREF(fram::FRAM * fram) {
-  fram_ = fram;
+  this->fram_ = fram;
 }
 
 void FRAM_PREF::set_pool(uint16_t pool_size, uint16_t pool_start=0) {
-  pool_size_ = pool_size;
-  pool_start_ = pool_start;
-  pool_next_ = pool_start + 4;
+  this->pool_size_ = pool_size;
+  this->pool_start_ = pool_start;
+  this->pool_next_ = pool_start + 4;
 }
 
 void FRAM_PREF::set_static_pref(std::string key, uint16_t addr, uint16_t size, std::function<uint32_t()> && fn, bool persist_key) {
@@ -91,71 +91,71 @@ void FRAM_PREF::set_static_pref(std::string key, uint16_t addr, uint16_t size, s
     flags |= FLAG_PERSIST_KEY;
   }
   
-  prefs_.push_back({.key=key, .addr=addr, .size=size, .size_req=0, .flags=flags});
-  prefs_static_cb_.push_back(fn);
+  this->prefs_.push_back({.key=key, .addr=addr, .size=size, .size_req=0, .flags=flags});
+  this->prefs_static_cb_.push_back(fn);
 }
 
 void FRAM_PREF::setup() {
-  if (!_check()) {
-    mark_failed();
+  if (!this->_check()) {
+    this->mark_failed();
     return;
   }
   
-  uint16_t fram_size = fram_->getSizeBytes();
-  size_t v_size = prefs_.size();
+  uint16_t fram_size = this->fram_->getSizeBytes();
+  size_t v_size = this->prefs_.size();
   
   for (size_t i = 0; i < v_size; i++) {
-    auto & pref = prefs_[i];
+    auto & pref = this->prefs_[i];
     uint16_t addr_end = pref.size ? (pref.addr + pref.size - 1) : 0;
     
     if (fram_size && (addr_end >= fram_size)) {
       pref.flags |= FLAG_ERR|FLAG_ERR_SIZE_FRAM;
     }
     
-    prefs_static_map_.insert({(prefs_static_cb_[i])(), i});
+    this->prefs_static_map_.insert({(this->prefs_static_cb_[i])(), i});
   }
   
-  prefs_static_cb_.clear();
+  this->prefs_static_cb_.clear();
   
-  if (pool_size_) {
+  if (this->pool_size_) {
     uint32_t hash = fnv1_hash(App.get_compilation_time());
     
-    if (hash != fram_->read32(pool_start_)) {
-      _clear();
-      fram_->write32(pool_start_, hash);
-      pool_cleared_ = true;
+    if (hash != this->fram_->read32(this->pool_start_)) {
+      this->_clear();
+      this->fram_->write32(this->pool_start_, hash);
+      this->pool_cleared_ = true;
     }
   }
   
-  pref_prev_ = global_preferences;
+  this->pref_prev_ = global_preferences;
   global_preferences = this;
 }
 
 void FRAM_PREF::dump_config() {
-  uint16_t fram_size = fram_->getSizeBytes();
+  uint16_t fram_size = this->fram_->getSizeBytes();
   
   ESP_LOGCONFIG(TAG, "FRAM_PREF:");
   
-  if (!_check()) {
+  if (!this->_check()) {
     return;
   }
   
-  if (pool_size_) {
-    uint16_t pool_end = pool_start_ + pool_size_;
+  if (this->pool_size_) {
+    uint16_t pool_end = this->pool_start_ + this->pool_size_;
     
-    ESP_LOGCONFIG(TAG, "  Pool: %u bytes (%u-%u)", pool_size_, pool_start_, (pool_end-1));
+    ESP_LOGCONFIG(TAG, "  Pool: %u bytes (%u-%u)", this->pool_size_, this->pool_start_, (pool_end-1));
     if (pool_end > fram_size) {
       ESP_LOGE(TAG, "  * Does not fit in FRAM (0-%u)!", (fram_size-1));
     }
     
-    if (pool_cleared_) {
+    if (this->pool_cleared_) {
       ESP_LOGI(TAG, "  Pool was cleared");
     }
     
-    ESP_LOGCONFIG(TAG, "  Pool: %u bytes used", pool_next_ - pool_start_);
+    ESP_LOGCONFIG(TAG, "  Pool: %u bytes used", this->pool_next_ - this->pool_start_);
   }
   
-  for (auto & pref : prefs_) {
+  for (auto & pref : this->prefs_) {
     std::string msg = str_sprintf("  Pref: key: %s", pref.key.c_str());
     
     if (pref.flags & FLAG_STATIC) {
@@ -197,14 +197,12 @@ void FRAM_PREF::dump_config() {
 }
 
 bool FRAM_PREF::_check() {
-  uint16_t fram_size = fram_->getSizeBytes();
-  
-  if (!fram_size) {
+  if (!this->fram_->getSizeBytes()) {
     ESP_LOGE(TAG, "  Device returns 0 size!");
     return false;
   }
   
-  if (!fram_->isConnected()) {
+  if (!this->fram_->isConnected()) {
     ESP_LOGE(TAG, "  Device connect failed!");
     return false;
   }
@@ -213,39 +211,39 @@ bool FRAM_PREF::_check() {
 }
 
 void FRAM_PREF::_clear() {
-  if (!pool_size_) {
+  if (!this->pool_size_) {
     return;
   }
   
   uint8_t buff[16];
-  uint16_t pool_end = pool_start_ + pool_size_;
+  uint16_t pool_end = this->pool_start_ + this->pool_size_;
   
   for (uint8_t i = 0; i < 16; i++) buff[i] = 0;
   
-  for (uint16_t addr = pool_start_+4; addr < pool_end; addr += 16) {
-    fram_->write(addr, buff, std::min(16,pool_end-addr));
+  for (uint16_t addr = this->pool_start_+4; addr < pool_end; addr += 16) {
+    this->fram_->write(addr, buff, std::min(16,pool_end-addr));
   }
   
   ESP_LOGD(TAG, "Pool cleared!");
 }
 
 ESPPreferenceObject FRAM_PREF::make_preference(size_t length, uint32_t type, bool in_flash) {
-  return make_preference(length, type);
+  return this->make_preference(length, type);
 }
 
 ESPPreferenceObject FRAM_PREF::make_preference(size_t length, uint32_t type) {
-  if (is_failed()) {
+  if (this->is_failed()) {
     return {};
   }
   
-  auto pref_static_it = prefs_static_map_.find(type);
+  auto pref_static_it = this->prefs_static_map_.find(type);
   uint16_t size = (uint16_t)length + 2;
   uint16_t addr;
   uint8_t idx;
   
-  if(pref_static_it != prefs_static_map_.end()) {
+  if(pref_static_it != this->prefs_static_map_.end()) {
     idx = pref_static_it->second;
-    auto & pref = prefs_[idx];
+    auto & pref = this->prefs_[idx];
     
     pref.size_req = size;
     
@@ -264,26 +262,26 @@ ESPPreferenceObject FRAM_PREF::make_preference(size_t length, uint32_t type) {
     }
   }
   else {
-    prefs_.push_back({.key=std::to_string(type), .addr=0, .size=0, .size_req=size, .flags=0});
-    idx = prefs_.size() - 1;
+    this->prefs_.push_back({.key=std::to_string(type), .addr=0, .size=0, .size_req=size, .flags=0});
+    idx = this->prefs_.size() - 1;
     
-    if(!pool_size_) {
+    if(!this->pool_size_) {
       return {};
     }
     
-    uint16_t pool_end = pool_start_ + pool_size_;
-    uint16_t next = pool_next_ + size;
-    addr = pool_next_;
+    uint16_t pool_end = this->pool_start_ + this->pool_size_;
+    uint16_t next = this->pool_next_ + size;
+    addr = this->pool_next_;
     
-    prefs_[idx].addr = addr;
-    prefs_[idx].size = size;
+    this->prefs_[idx].addr = addr;
+    this->prefs_[idx].size = size;
     
     if (next > pool_end) {
-      prefs_[idx].flags |= FLAG_ERR|FLAG_ERR_SIZE_POOL;
+      this->prefs_[idx].flags |= FLAG_ERR|FLAG_ERR_SIZE_POOL;
       return {};
     }
     
-    pool_next_ = next;
+    this->pool_next_ = next;
   }
   
   auto * pref = new FRAMPreferenceBackend(this, type, idx);
@@ -292,14 +290,14 @@ ESPPreferenceObject FRAM_PREF::make_preference(size_t length, uint32_t type) {
 }
 
 bool FRAM_PREF::sync() {
-  return pref_prev_->sync();
+  return this->pref_prev_->sync();
 }
 
 bool FRAM_PREF::reset() {
-  if (pool_size_) {
-    fram_->write32(pool_start_, 0);
+  if (this->pool_size_) {
+    this->fram_->write32(pool_start_, 0);
   }
-  return pref_prev_->reset();
+  return this->pref_prev_->reset();
 }
 
 }  // namespace fram_pref
