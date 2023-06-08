@@ -1,3 +1,5 @@
+> :warning: Use the PR version at https://github.com/esphome/esphome/pull/4880, as that may go in esphome and that will be updated in the future.
+
 # esphome-fram
 ESPHome port of [RobTillaart/FRAM_I2C](https://github.com/RobTillaart/FRAM_I2C)
 
